@@ -24,6 +24,7 @@ class Scrapper:
 
 
 if __name__ == "__main__":
+    name = input("Please enter the name of the business: ")
     scraper = Scrapper()
     scraper.scrape()
 
