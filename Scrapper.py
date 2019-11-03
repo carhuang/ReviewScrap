@@ -34,11 +34,16 @@ class Scrapper:
     def extract_reviews(self, number_of_reviews: int):
         all_reviews = WebDriverWait(self.driver, 3).until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div.gws-localreviews__google-review')))
+        print(len(all_reviews))
+        ignored_exceptions = (NoSuchElementException, StaleElementReferenceException)
         while len(all_reviews) < number_of_reviews:
             self.driver.execute_script('arguments[0].scrollIntoView(true);', all_reviews[-1])
             WebDriverWait(self.driver, 5, 0.25).until_not(
                 EC.presence_of_element_located((By.CSS_SELECTOR, 'div[class$="activityIndicator"]')))
-            all_reviews = self.driver.find_elements_by_css_selector('div.gws-localreviews__google-review')
+            all_reviews = WebDriverWait(self.driver, 5, ignored_exceptions=ignored_exceptions)\
+                .until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div.gws-localreviews__google-review')))
+            print(len(all_reviews))
+            #all_reviews = self.driver.find_elements_by_css_selector('div.gws-localreviews__google-review')
 
         for review in all_reviews:
             try:
@@ -49,7 +54,7 @@ class Scrapper:
             rating = self.extract_rating(rating_element)
             data = full_text_element.get_attribute('textContent')
             review_entry = [rating, data]
-            print(review_entry)
+            #print(review_entry)
             #reviews.append(review_entry)
 
     def scrape(self, name: str):
