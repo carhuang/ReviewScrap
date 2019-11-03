@@ -1,32 +1,74 @@
 import time
 
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
-
-
-#Define url page
-url = "https://www.google.com/search?sxsrf=ACYBGNQDIoR7RK4HCgSBHBfSl0hr_euaTA%3A1572393269091&ei=NdG4XcCjBZK9-gTAqo2oBw&q=stanley+park+google+maps&oq=stanley+park+googl&gs_l=psy-ab.1.0.0j0i22i30l4.641845.643191..644921...0.0..0.138.569.5j1......0....1..gws-wiz.......0i67j0i131j0i131i20i263j0i20i263j0i10j0i203j0i22i10i30.G4ctruIUeXE#lrd=0x5486718cad26e4a3:0x364a639db409e216,1,,,"
+from typing import List
 
 
 class Scrapper:
     def __init__(self):
         self.driver = webdriver.Firefox()
 
-    def get_business_page(self):
-        name = input("Please enter the url of the business on google: ")
-        self.driver.get(name)
+    def get_business_page(self, name: str):
+        self.driver.get("https://www.google.com/?hl=en")
+        self.driver.find_element_by_name('q').send_keys(name)
+        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.NAME, 'btnK'))).click()
 
-    def scrape(self):
-        self.get_business_page()
+    def get_review_page(self) -> int:
+        reviews_link = self.driver.find_element_by_css_selector('div.kp-header').find_element_by_partial_link_text(
+            'Google reviews')
+        reviews_link.click()
+        reviews_header = WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, 'review-score-container')))
+        reviews_count = reviews_header.find_element_by_css_selector('div:first-child > div > span').text.split()[0]
+        number_of_reviews = int(reviews_count.replace(',', ''))
+        print(number_of_reviews)
+        return number_of_reviews
+
+    def extract_rating(self, data: str) -> int:
+        rating = float(data.split()[1])
+        return int(rating)
+
+    def extract_reviews(self, number_of_reviews: int):
+        all_reviews = WebDriverWait(self.driver, 3).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div.gws-localreviews__google-review')))
+        while len(all_reviews) < number_of_reviews:
+            self.driver.execute_script('arguments[0].scrollIntoView(true);', all_reviews[-1])
+            WebDriverWait(self.driver, 5, 0.25).until_not(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'div[class$="activityIndicator"]')))
+            all_reviews = self.driver.find_elements_by_css_selector('div.gws-localreviews__google-review')
+
+        for review in all_reviews:
+            try:
+                full_text_element = review.find_element_by_css_selector('span.review-full-text')
+            except NoSuchElementException:
+                full_text_element = review.find_element_by_css_selector('span[class^="r-"]')
+            rating_element = review.find_element_by_css_selector('g-review-stars > span').get_attribute("aria-label")
+            rating = self.extract_rating(rating_element)
+            data = full_text_element.get_attribute('textContent')
+            review_entry = [rating, data]
+            print(review_entry)
+            #reviews.append(review_entry)
+
+    def scrape(self, name: str):
+        # try:
+            self.get_business_page(name)
+            total_review_count = self.get_review_page()
+            self.extract_reviews(total_review_count)
+            #print("Final number of result is " + len(results))
+
+
+        # finally:
+        #     self.driver.close()
 
 
 if __name__ == "__main__":
-    name = input("Please enter the name of the business: ")
+    query = input("Please enter the name of the business: ")
     scraper = Scrapper()
-    scraper.scrape()
+    print(query)
+    scraper.scrape(query)
 
 
 
